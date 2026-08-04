@@ -613,7 +613,7 @@ fun AddBookOptionsDialog(
                 }
 
                 Button(
-                    onClick = { fileLauncher.launch("*/*") },
+                    onClick = { fileLauncher.launch(arrayOf("*/*")) },
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(containerColor = GoldenOrange)
                 ) {

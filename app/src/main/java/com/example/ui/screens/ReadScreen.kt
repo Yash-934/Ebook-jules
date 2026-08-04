@@ -639,7 +639,7 @@ fun ReadScreen(
                         onClick = { isFullScreen = false },
                         modifier = Modifier
                             .padding(16.dp)
-                            .align(Alignment.TopEnd)
+
                             .statusBarsPadding()
                             .background(Color.Black.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
                     ) {
@@ -714,7 +714,6 @@ fun ReadScreen(
             }
         }
     }
-}
 
 @Composable
 fun FileRow(fileName: String, description: String, textColor: Color, fontSize: Float, lineSpacing: Float, wordSpacing: Float, fontFamily: FontFamily) {

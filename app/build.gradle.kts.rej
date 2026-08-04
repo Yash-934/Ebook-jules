@@ -1,0 +1,20 @@
+--- app/build.gradle.kts
++++ app/build.gradle.kts
+@@ -50,9 +53,15 @@
+   buildTypes {
+     release {
+       isCrunchPngs = false
+       isMinifyEnabled = false
+       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+-      signingConfig = signingConfigs.getByName("release")
++      if (signingConfigs.getByName("release").storeFile != null) {
++          signingConfig = signingConfigs.getByName("release")
++      }
+     }
+-    debug { signingConfig = signingConfigs.getByName("debugConfig") }
++    debug {
++        if (signingConfigs.getByName("debugConfig").storeFile != null) {
++            signingConfig = signingConfigs.getByName("debugConfig")
++        }
++    }
+   }
