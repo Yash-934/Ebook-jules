@@ -317,9 +317,9 @@ fun HomeScreen(
         if (showAddBookOptions) {
             AddBookOptionsDialog(
                 onDismiss = { showAddBookOptions = false },
-                onAddBook = { title, author, format, coverUri ->
+                onAddBook = { title, author, format, coverUri, localUri ->
                     val destFolder = if (selectedFolder == "All") "Main" else selectedFolder
-                    ebookViewModel.addBook(Book(title = title, author = author, format = format, localUri = "mock_path", coverUri = coverUri, folder = destFolder))
+                    ebookViewModel.addBook(Book(title = title, author = author, format = format, localUri = localUri, coverUri = coverUri, folder = destFolder))
                 }
             )
         }
@@ -551,30 +551,48 @@ fun BookItem(
 @Composable
 fun AddBookOptionsDialog(
     onDismiss: () -> Unit,
-    onAddBook: (String, String, String, String) -> Unit
+    onAddBook: (String, String, String, String, String) -> Unit
 ) {
     val folderLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocumentTree()
     ) { uri ->
         if (uri != null) {
-            onAddBook("Imported Book 1", "Unknown Author", "PDF", "")
-            onAddBook("Imported Book 2", "Unknown Author", "EPUB", "")
-            onAddBook("Imported Book 3", "Unknown Author", "HTML", "")
+            onAddBook("Imported Book 1", "Unknown Author", "PDF", "", uri.toString())
+            onAddBook("Imported Book 2", "Unknown Author", "EPUB", "", uri.toString())
+            onAddBook("Imported Book 3", "Unknown Author", "HTML", "", uri.toString())
             onDismiss()
         } else {
             onDismiss()
         }
     }
 
+    val context = androidx.compose.ui.platform.LocalContext.current
     val fileLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
+        contract = androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
     ) { uri ->
         if (uri != null) {
-            val fileName = uri.lastPathSegment?.split("/")?.lastOrNull() ?: "Unknown"
+            try {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            } catch (e: Exception) {}
+
+            // Get actual filename
+            var fileName = "Unknown"
+            context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                if (cursor.moveToFirst() && nameIndex != -1) {
+                    fileName = cursor.getString(nameIndex)
+                }
+            }
+            if (fileName == "Unknown") {
+                fileName = uri.lastPathSegment?.split("/")?.lastOrNull() ?: "Unknown"
+            }
+
             val title = fileName.substringBeforeLast(".")
             val format = fileName.substringAfterLast(".", "HTML").uppercase()
-            // Simulating auto-detecting a cover (empty string implies fallback to emoji, but real app would extract cover from metadata)
-            onAddBook(title, "Unknown Author", format, "")
+            onAddBook(title, "Unknown Author", format, "", uri.toString())
             onDismiss()
         } else {
             onDismiss()
