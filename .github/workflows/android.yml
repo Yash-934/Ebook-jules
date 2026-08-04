@@ -5,7 +5,7 @@ on:
     branches: [ "main", "master" ]
   pull_request:
     branches: [ "main", "master" ]
-  workflow_dispatch: # Allows manual trigger from GitHub UI
+  workflow_dispatch:
 
 jobs:
   build:
@@ -23,7 +23,6 @@ jobs:
 
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v3
-      # Cache disabled hata diya gaya hai taaki builds fast hon
 
     - name: Prepare build environment
       run: |
@@ -36,12 +35,11 @@ jobs:
         # Create a dummy google-services.json to satisfy the Google Services plugin
         echo '{"project_info":{"project_number":"123","project_id":"dummy","storage_bucket":"dummy.appspot.com"},"client":[{"client_info":{"mobilesdk_app_id":"1:123:android:abc","android_client_info":{"package_name":"com.aistudio.ebookreader.xkjqwe"}},"api_key":[{"current_key":"dummy"}]}]}' > app/google-services.json
         
-        # Ensure the Gradle wrapper is executable
-        chmod +x gradlew
+        # NOTE: Humne yahan se 'chmod +x gradlew' hata diya hai kyunki file exist nahi karti.
 
     - name: Build Debug APK
-      # xvfb-run fake screen banata hai taaki AWT NullPointerException fix ho jaye
-      run: xvfb-run ./gradlew assembleDebug --stacktrace
+      # gradlew ki jagah wapas 'gradle' use kar rahe hain, par xvfb-run ke sath
+      run: xvfb-run gradle assembleDebug --stacktrace
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
