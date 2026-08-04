@@ -54,6 +54,12 @@ import androidx.compose.ui.Alignment
 import android.speech.tts.TextToSpeech
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.viewinterop.AndroidView
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import android.webkit.WebChromeClient
+import android.webkit.WebSettings
+import android.util.Base64
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
@@ -104,6 +110,27 @@ fun ReadScreen(
     var highlightColor by remember { mutableStateOf(Color(0xFFFFD700)) }
     var underlineColor by remember { mutableStateOf(Color.Red) }
     var doodleColor by remember { mutableStateOf(Color(0xFF87CEEB)) }
+
+    var bookContent by remember { mutableStateOf<String?>(null) }
+    val readContext = LocalContext.current
+
+    LaunchedEffect(book?.localUri) {
+        val uriStr = book?.localUri
+        if (!uriStr.isNullOrEmpty() && uriStr != "mock_path") {
+            try {
+                val uri = android.net.Uri.parse(uriStr)
+                readContext.contentResolver.openInputStream(uri)?.use { inputStream ->
+                    bookContent = Base64.encodeToString(inputStream.readBytes(), Base64.NO_WRAP)
+                }
+            } catch (e: Exception) {
+                bookContent = "Error reading file: ${e.message}"
+            }
+        }
+    }
+
+
+
+
     val drawnLines = remember { androidx.compose.runtime.mutableStateListOf<DrawnLine>() }
     var loadedAnnotations by remember { mutableStateOf(false) }
 
@@ -158,7 +185,7 @@ fun ReadScreen(
         }
     }
 
-    val ttsContent = "Folio. A single-file, offline-capable eBook reader. Everything is stored locally. Quickest way to run it is to just open index.html in a browser."
+    val ttsContent = bookContent ?: "No content available to read."
 
     var isAutoScrolling by remember { mutableStateOf(false) }
 
@@ -530,91 +557,33 @@ fun ReadScreen(
                     }
             ) {
                 Box(modifier = Modifier.fillMaxWidth()) {
-                    SelectionContainer {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = margins.dp, vertical = margins.dp)
-                    ) {
-                    Text(
-                        text = book?.title ?: "Athenaeum — Advanced Web eBook Reader",
-                        fontSize = (fontSize * 1.5f).sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = selectedFontFamily,
-                        lineHeight = (fontSize * 1.5f * lineSpacing).sp,
-                        letterSpacing = wordSpacing.sp,
-                        color = textColor,
-                        modifier = Modifier.padding(bottom = (fontSize * 1.2f).dp)
-                    )
+                    AndroidView(
+                    modifier = Modifier.fillMaxSize(),
+                    factory = { context ->
+                        WebView(context).apply {
+                            settings.javaScriptEnabled = true
+                            settings.domStorageEnabled = true
+                            settings.allowFileAccess = true
+                            settings.allowFileAccessFromFileURLs = true
+                            settings.allowUniversalAccessFromFileURLs = true
 
-                    Text(
-                        text = "A single-file, offline-capable eBook reader. Everything (library, highlights, notes, bookmarks, progress, settings) is stored locally in your browser via IndexedDB — nothing is uploaded anywhere.",
-                        fontSize = fontSize.sp,
-                        lineHeight = (fontSize * lineSpacing).sp,
-                        letterSpacing = wordSpacing.sp,
-                        fontFamily = selectedFontFamily,
-                        color = textColor,
-                        modifier = Modifier.padding(bottom = (fontSize * 1.5f).dp)
-                    )
-
-                    Text(
-                        text = "Files",
-                        fontSize = (fontSize * 1.2f).sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = selectedFontFamily,
-                        letterSpacing = wordSpacing.sp,
-                        color = textColor,
-                        modifier = Modifier.padding(bottom = (fontSize * 0.8f).dp)
-                    )
-
-                    Row(modifier = Modifier.padding(bottom = (fontSize * 0.8f).dp)) {
-                        Text(
-                            text = "File",
-                            fontSize = fontSize.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = selectedFontFamily,
-                            letterSpacing = wordSpacing.sp,
-                            color = textColor,
-                            modifier = Modifier.weight(0.3f).padding(end = 16.dp)
-                        )
-                        Text(
-                            text = "Purpose",
-                            fontSize = fontSize.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = selectedFontFamily,
-                            letterSpacing = wordSpacing.sp,
-                            color = textColor,
-                            modifier = Modifier.weight(0.7f)
-                        )
+                            webViewClient = object : WebViewClient() {
+                                override fun onPageFinished(view: WebView?, url: String?) {
+                                    super.onPageFinished(view, url)
+                                    if (bookContent != null) {
+                                        val js = "if(window.loadBookFromBase64) { window.loadBookFromBase64('${book?.format ?: "TXT"}', '$bookContent'); } else { console.log('loadBookFromBase64 not found'); }"
+                                        view?.evaluateJavascript(js, null)
+                                    }
+                                }
+                            }
+                            webChromeClient = WebChromeClient()
+                            loadUrl("file:///android_asset/index.html")
+                        }
+                    },
+                    update = { webView ->
+                        // Javascript is injected when page is finished loading
                     }
-
-                    FileRow("index.html", "The entire app — HTML, CSS and JS in one file. This is what you open.", textColor, fontSize, lineSpacing, wordSpacing, selectedFontFamily)
-                    FileRow("manifest.json", "PWA metadata (name, icons, colors) so it can be \"installed\".", textColor, fontSize, lineSpacing, wordSpacing, selectedFontFamily)
-                    FileRow("service-worker.js", "Enables full offline use once deployed to a real host.", textColor, fontSize, lineSpacing, wordSpacing, selectedFontFamily)
-                    FileRow("icons/", "App icons for the home-screen/install shortcut.", textColor, fontSize, lineSpacing, wordSpacing, selectedFontFamily)
-
-                    Spacer(modifier = Modifier.height(32.dp))
-
-                    Text(
-                        text = "Running it",
-                        fontSize = (fontSize * 1.2f).sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = selectedFontFamily,
-                        letterSpacing = wordSpacing.sp,
-                        color = textColor,
-                        modifier = Modifier.padding(bottom = (fontSize * 0.8f).dp)
-                    )
-
-                    Text(
-                        text = "Quickest: just open index.html in a browser. Everything works — adding books, reading, highlighting, TTS, themes, export/import — except the PWA install prompt and offline caching, which browsers only allow over http(s)://, not file://.",
-                        fontSize = fontSize.sp,
-                        lineHeight = (fontSize * lineSpacing).sp,
-                        letterSpacing = wordSpacing.sp,
-                        fontFamily = selectedFontFamily,
-                        color = textColor,
-                        modifier = Modifier.padding(bottom = 32.dp)
-                    )
-                }
+                )
 
                     }
 
